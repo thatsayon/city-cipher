@@ -1,0 +1,78 @@
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+        }
+        .header img {
+            max-width: 150px;
+            margin-bottom: 15px;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .highlight {
+            color: #2a5a8d;
+            font-weight: 600;
+        }
+        .otp {
+            font-size: 24px;
+            letter-spacing: 3px;
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: inline-block;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://mind-cryptic.netlify.app/assets/logo-CcUHoS0v.png" alt="Mind Cryptic Logo">
+            <h1>Verify Your Email Address</h1>
+            <div>
+                <h3>Hello, {{ full_name }}</h3>
+            </div>
+        </div>
+
+        <div class="content">
+            <p>You're now at the final stage of joining the <span class="highlight">Mind Cryptic</span> community. You're almost ready to start using our platform, but first we need to verify your email address.</p>
+
+            <p>Please use the following One-Time Password (OTP) to complete your verification:</p>
+            
+            <div class="otp">{{ email_otp }}</div>
+
+            <p>If you didn't create an account with <span class="highlight">Mind Cryptic</span>, please disregard this email. This verification code will expire after 5 minutes.</p>
+        </div>
+
+        <div class="footer">
+            <p>Need help? Contact our support team at support@mindcryptic.com</p>
+            <p>© 2025 Mind Cryptic. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
