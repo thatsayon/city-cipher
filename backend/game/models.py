@@ -2,6 +2,7 @@ from django.db import models
 from .leaderboard.models import *
 import uuid
 
+# game model
 class Game(models.Model):
     GAME_TYPE_CHOICES = [
         ('solo', 'Solo Player'),
