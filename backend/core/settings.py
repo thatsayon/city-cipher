@@ -39,12 +39,14 @@ INSTALLED_APPS += [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'channels',
 ]
 
 # built-in apps
 INSTALLED_APPS += [
     'authentication',
     'game',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -82,6 +84,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# needed for websocket
+ASGI_APPLICATION = 'core.asgi.application'
+
+# currently working for chat feature
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],  # Redis host & port
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases

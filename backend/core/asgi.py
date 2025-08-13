@@ -1,16 +1,19 @@
-"""
-ASGI config for core project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
-"""
-
+# core/asgi.py
 import os
-
+import django
 from django.core.asgi import get_asgi_application
+import socketio
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django.setup()
 
-application = get_asgi_application()
+# Create Socket.IO server
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+django_asgi_app = get_asgi_application()
+
+# Import event handlers after sio creation
+from chat import socket_handlers
+
+# Mount Socket.IO
+application = socketio.ASGIApp(sio, django_asgi_app)
+
