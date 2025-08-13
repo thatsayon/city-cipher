@@ -1,10 +1,11 @@
-# chat/socket_handlers.py
 from core.asgi import sio
 from .models import ChatRoom, ChatMessage
 from django.contrib.auth import get_user_model
 from asgiref.sync import sync_to_async
 
 User = get_user_model()
+
+# hi
 
 @sio.event
 async def connect(sid, environ):
