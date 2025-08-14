@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from rest_framework import generics, permissions
 from django.db.models import Q
 from django.db import models
@@ -14,10 +15,25 @@ class GetUserChatRooms(generics.ListAPIView):
     
     def get_queryset(self):
         user = self.request.user
-        # Return chat rooms where the user is either the room user or part of the team
+        
+        # Return rooms where:
+        # - It's a private chat and the user is either user_1 or user_2
+        # - OR it's a team chat and the user is a member of the team
         return ChatRoom.objects.filter(
-            models.Q(user=user)
+            Q(room_type='private', user_1=user) | Q(room_type='private', user_2=user) |
+            Q(room_type='team', team__members=user)
+        ).prefetch_related(
+            Prefetch(
+                'messages',
+                queryset=ChatMessage.objects.order_by('-created_at')[:10],  # last 10 messages
+                to_attr='latest_messages'
+            )
         ).distinct().order_by('-created_at')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
 class ChatHistoryView(generics.ListAPIView):
     serializer_class = UserChatRoomSerializer
