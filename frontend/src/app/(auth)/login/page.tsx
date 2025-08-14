@@ -55,11 +55,17 @@ const Login: React.FC = () => {
         return;
       }
 
+      
       if ((res as any).access_token) {
-        sessionStorage.setItem('access_token', (res as any).access_token);
+        const token = (res as any).access_token;
+
+        // Save token in cookie (expires in 7 days)
+        document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=strict`;
+
         router.push('/dashboard');
         return;
       }
+
 
       setErrors({ general: 'Unexpected response from server.' });
     } catch (err: any) {
