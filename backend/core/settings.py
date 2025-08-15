@@ -19,7 +19,9 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "*"
+]
 
 
 # Application definition
@@ -62,7 +64,8 @@ MIDDLEWARE = [
 
 # cors settings 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://zm3lx8v7-3000.inc1.devtunnels.ms"
 ]
 
 ROOT_URLCONF = 'core.urls'

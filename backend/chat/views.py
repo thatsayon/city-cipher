@@ -1,8 +1,15 @@
 from django.db.models import Prefetch
 from rest_framework import generics, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from django.db.models import Q
 from django.db import models
+
+from agora_token_builder import RtcTokenBuilder
+
 from .models import ChatMessage, ChatRoom
+import os
+import time 
 
 from .serializers import (
     ChatMessageSerializer,
@@ -43,3 +50,29 @@ class ChatHistoryView(generics.ListAPIView):
         room_id = self.kwargs['room_id']
         return ChatMessage.objects.filter(room_id=room_id).order_by('-created_at')
 
+class GenerateAgoraTokenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]  # Optional: restrict token generation
+
+    def get(self, request):
+        app_id = os.getenv("AGORA_APP_ID")
+        app_certificate = os.getenv("AGORA_APP_CERTIFICATE")
+        channel_name = request.query_params.get("channelName")
+        uid = request.query_params.get("uid", "0")  # "0" lets Agora assign UID
+
+        if not channel_name:
+            return Response({"error": "channelName is required"}, status=400)
+
+        expiration_time_in_seconds = 3600  # 1 hour
+        current_timestamp = int(time.time())
+        privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+
+        token = RtcTokenBuilder.buildTokenWithUid(
+            app_id, app_certificate, channel_name, int(uid), 1, privilege_expired_ts
+        )
+
+        return Response({
+            "appId": app_id,
+            "token": token,
+            "channelName": channel_name,
+            "uid": uid
+        })
