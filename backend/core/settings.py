@@ -65,7 +65,8 @@ MIDDLEWARE = [
 # cors settings 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://zm3lx8v7-3000.inc1.devtunnels.ms"
+    "https://zm3lx8v7-3000.inc1.devtunnels.ms",
+    "https://luminex-eta.vercel.app",
 ]
 
 ROOT_URLCONF = 'core.urls'
