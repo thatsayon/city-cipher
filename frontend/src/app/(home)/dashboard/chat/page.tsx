@@ -1,6 +1,3 @@
-
-
-// // app/dashboard/messaging/page.tsx
 // "use client";
 // import React, { useState, useEffect, useRef } from 'react';
 // import { io, Socket } from 'socket.io-client';
@@ -59,6 +56,7 @@
 //   type: 'text' | 'image' | 'file';
 //   status: 'sent' | 'delivered' | 'read';
 //   isMine: boolean;
+//   roomId: string;
 // }
 
 // function MessagingPage() {
@@ -68,10 +66,16 @@
 //   const [searchQuery, setSearchQuery] = useState('');
 //   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
 //   const [contacts, setContacts] = useState<Contact[]>([]);
-//   const [messages, setMessages] = useState<Message[]>([]);
+  
+//   // Store messages for ALL rooms, not just current room
+//   const [allMessages, setAllMessages] = useState<{ [roomId: string]: Message[] }>({});
+  
 //   const [socketConnected, setSocketConnected] = useState(false);
+//   const [authenticated, setAuthenticated] = useState(false);
 //   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-//   const [loadingMessages, setLoadingMessages] = useState(false);
+//   const [loadingMessages, setLoadingMessages] = useState<{ [roomId: string]: boolean }>({});
+//   const [joinedRooms, setJoinedRooms] = useState<Set<string>>(new Set());
+//   const [joiningRooms, setJoiningRooms] = useState<Set<string>>(new Set());
   
 //   const socketRef = useRef<Socket | null>(null);
 //   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -123,14 +127,19 @@
 //     }
 //   };
 
-//   // Auto-scroll to bottom of messages
+//   // Auto-scroll to bottom of messages for current room only
 //   const scrollToBottom = () => {
-//     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+//     if (selectedContact) {
+//       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+//     }
 //   };
+
+//   // Get messages for the currently selected room
+//   const currentRoomMessages = selectedContact ? (allMessages[selectedContact] || []) : [];
 
 //   useEffect(() => {
 //     scrollToBottom();
-//   }, [messages]);
+//   }, [currentRoomMessages, selectedContact]);
 
 //   // Initialize current user ID
 //   useEffect(() => {
@@ -138,71 +147,141 @@
 //     setCurrentUserId(userId);
 //   }, []);
 
-//   // Initialize Socket.IO connection
+//   // Initialize Socket.IO connection ONCE when component mounts
 //   useEffect(() => {
 //     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000';
     
+//     console.log('🔌 Initializing socket connection...');
 //     socketRef.current = io(SOCKET_URL, {
 //       transports: ['websocket', 'polling'],
 //     });
 
-//     socketRef.current.on('connect', () => {
+//     const socket = socketRef.current;
+
+//     socket.on('connect', () => {
 //       console.log('🔌 Connected to socket server');
 //       setSocketConnected(true);
 //     });
 
-//     socketRef.current.on('disconnect', () => {
+//     socket.on('disconnect', () => {
 //       console.log('❌ Disconnected from socket server');
 //       setSocketConnected(false);
+//       setAuthenticated(false);
+//       setJoinedRooms(new Set());
+//       setJoiningRooms(new Set());
 //     });
 
-//     socketRef.current.on('user_joined', (data) => {
+//     // Handle authentication response
+//     socket.on('authentication_success', (data) => {
+//       console.log('✅ Authentication successful:', data);
+//       setAuthenticated(true);
+//     });
+
+//     // Handle room join confirmation
+//     socket.on('room_joined', (data) => {
+//       console.log('✅ Successfully joined room:', data);
+//       setJoinedRooms(prev => new Set([...prev, data.room_id]));
+//       setJoiningRooms(prev => {
+//         const newSet = new Set(prev);
+//         newSet.delete(data.room_id);
+//         return newSet;
+//       });
+//     });
+
+//     // Handle room leave confirmation
+//     socket.on('room_left', (data) => {
+//       console.log('👋 Successfully left room:', data);
+//       setJoinedRooms(prev => {
+//         const newSet = new Set(prev);
+//         newSet.delete(data.room_id);
+//         return newSet;
+//       });
+//     });
+
+//     // Handle already in room
+//     socket.on('already_in_room', (data) => {
+//       console.log('ℹ️ Already in room:', data.room_id);
+//       setJoinedRooms(prev => new Set([...prev, data.room_id]));
+//       setJoiningRooms(prev => {
+//         const newSet = new Set(prev);
+//         newSet.delete(data.room_id);
+//         return newSet;
+//       });
+//     });
+
+//     socket.on('user_joined', (data) => {
 //       console.log('👤 User joined room:', data);
 //     });
 
-//     socketRef.current.on('new_message', (data) => {
-//       console.log('📨 New message received:', data);
-      
-//       // Check if this message is from the current user (to avoid duplicates)
-//       const isFromCurrentUser = data.sender_id === currentUserId;
-      
-//       if (!isFromCurrentUser) {
-//         const newMessage: Message = {
-//           id: data.id || Date.now().toString(),
-//           senderId: data.sender_id || 'unknown',
-//           sender: data.sender,
-//           content: data.message,
-//           timestamp: formatTimestamp(data.created_at || data.timestamp || new Date().toISOString()),
-//           isRead: false,
-//           type: 'text',
-//           status: 'delivered',
-//           isMine: false,
-//         };
-
-//         setMessages(prev => [...prev, newMessage]);
-        
-//         // Update the contact's last message if it's the currently selected room
-//         if (data.room_id === selectedContact) {
-//           setContacts(prev => prev.map(contact => {
-//             if (contact.id === selectedContact) {
-//               return {
-//                 ...contact,
-//                 lastMessage: data.message,
-//                 timestamp: newMessage.timestamp,
-//                 unreadCount: contact.unreadCount + 1
-//               };
-//             }
-//             return contact;
-//           }));
-//         }
-//       }
+//     socket.on('user_left', (data) => {
+//       console.log('👋 User left room:', data);
 //     });
 
-//     socketRef.current.on('room_messages', (data) => {
-//       console.log('📋 Room messages received:', data);
-//       setLoadingMessages(false);
+//     // Global message listener - THIS IS THE KEY FIX
+//     socket.on('new_message', (data) => {
+//       console.log('📨 New message received:', data);
       
-//       if (data.room_id === selectedContact && data.messages) {
+//       const messageRoomId = data.room_id;
+      
+//       // Create new message object
+//       const newMessage: Message = {
+//         id: data.id || Date.now().toString(),
+//         senderId: data.sender_id || 'unknown',
+//         sender: data.sender,
+//         content: data.message,
+//         timestamp: formatTimestamp(data.created_at || data.timestamp || new Date().toISOString()),
+//         isRead: false,
+//         type: 'text',
+//         status: 'delivered',
+//         isMine: data.sender_id === currentUserId,
+//         roomId: messageRoomId,
+//       };
+
+//       // Add message to the specific room's message array
+//       setAllMessages(prev => {
+//         const existingMessages = prev[messageRoomId] || [];
+        
+//         // Check if message already exists (to prevent duplicates)
+//         const messageExists = existingMessages.some(msg => 
+//           msg.id === newMessage.id || 
+//           (msg.content === newMessage.content && 
+//            msg.senderId === newMessage.senderId && 
+//            Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 5000)
+//         );
+        
+//         if (messageExists) {
+//           console.log('Message already exists, skipping duplicate');
+//           return prev;
+//         }
+        
+//         return {
+//           ...prev,
+//           [messageRoomId]: [...existingMessages, newMessage]
+//         };
+//       });
+      
+//       // Update the contact's last message and unread count
+//       setContacts(prev => prev.map(contact => {
+//         if (contact.id === messageRoomId) {
+//           return {
+//             ...contact,
+//             lastMessage: data.message,
+//             timestamp: newMessage.timestamp,
+//             unreadCount: selectedContact === messageRoomId ? 0 : contact.unreadCount + 1
+//           };
+//         }
+//         return contact;
+//       }));
+//     });
+
+//     // Room messages listener - handles initial message loading for a room
+//     socket.on('room_messages', (data) => {
+//       console.log('📋 Room messages received:', data);
+//       const roomId = data.room_id;
+      
+//       setLoadingMessages(prev => ({ ...prev, [roomId]: false }));
+      
+//       if (data.messages) {
 //         const roomMessages: Message[] = data.messages.map((msg: any) => ({
 //           id: msg.id,
 //           senderId: msg.sender_id,
@@ -213,43 +292,100 @@
 //           type: 'text',
 //           status: msg.sender_id === currentUserId ? 'read' : 'delivered',
 //           isMine: msg.sender_id === currentUserId,
+//           roomId: roomId,
 //         }));
-//         setMessages(roomMessages);
+        
+//         // Store messages for this specific room
+//         setAllMessages(prev => ({
+//           ...prev,
+//           [roomId]: roomMessages
+//         }));
 //       }
 //     });
 
-//     socketRef.current.on('error', (error) => {
+//     socket.on('error', (error) => {
 //       console.error('❌ Socket error:', error);
-//       // Show user-friendly error message
 //       if (error.error) {
 //         console.error('Backend error:', error.error);
+        
+//         // Handle specific error cases
+//         if (error.error.includes('authentication required')) {
+//           setAuthenticated(false);
+//         }
+        
+//         // Remove from joining rooms if join failed
+//         if (error.error.includes('join')) {
+//           setJoiningRooms(prev => {
+//             const newSet = new Set(prev);
+//             newSet.clear(); // Clear all joining rooms on error
+//             return newSet;
+//           });
+//         }
 //       }
 //     });
 
+//     // Cleanup: disconnect socket when component unmounts
 //     return () => {
-//       if (socketRef.current) {
-//         socketRef.current.disconnect();
-//       }
+//       console.log('🔌 Cleaning up socket connection...');
+//       socket.disconnect();
 //     };
-//   }, [selectedContact, currentUserId]);
+//   }, []); // Remove dependencies to prevent re-initialization
 
-//   // Join room when selecting a contact
+//   // Separate effect for authentication when currentUserId is available
 //   useEffect(() => {
-//     if (selectedContact && socketRef.current && socketConnected) {
-//       console.log('🏠 Joining room:', selectedContact);
-      
-//       socketRef.current.emit('join_room', {
-//         room_id: selectedContact
+//     if (socketConnected && currentUserId && !authenticated && socketRef.current) {
+//       console.log('🔐 Authenticating user:', currentUserId);
+//       socketRef.current.emit('authenticate_user', {
+//         user_id: currentUserId
 //       });
+//     }
+//   }, [socketConnected, currentUserId, authenticated]);
+
+//   // Separate effect for room joining when selecting a contact
+//   useEffect(() => {
+//     if (selectedContact && socketRef.current && socketConnected && currentUserId && authenticated) {
+//       // Only join if we haven't joined this room yet and aren't currently joining
+//       if (!joinedRooms.has(selectedContact) && !joiningRooms.has(selectedContact)) {
+//         console.log('🏠 Joining room:', selectedContact);
+        
+//         // Mark as joining to prevent duplicate requests
+//         setJoiningRooms(prev => new Set([...prev, selectedContact]));
+        
+//         socketRef.current.emit('join_room', {
+//           room_id: selectedContact,
+//           user_id: currentUserId
+//         });
+//       }
       
-//       // Request messages for the selected room
-//       setLoadingMessages(true);
+//       // Request messages if we don't have them and we're joined
+//       if (joinedRooms.has(selectedContact) && !allMessages[selectedContact] && !loadingMessages[selectedContact]) {
+//         setLoadingMessages(prev => ({ ...prev, [selectedContact]: true }));
+//         socketRef.current.emit('get_room_messages', {
+//           room_id: selectedContact,
+//           limit: 50
+//         });
+//       }
+      
+//       // Mark messages as read for the selected room
+//       setContacts(prev => prev.map(contact => {
+//         if (contact.id === selectedContact) {
+//           return { ...contact, unreadCount: 0 };
+//         }
+//         return contact;
+//       }));
+//     }
+//   }, [selectedContact, socketConnected, currentUserId, authenticated, joinedRooms, joiningRooms]);
+
+//   // Effect to request messages when a room is joined
+//   useEffect(() => {
+//     if (socketRef.current && selectedContact && joinedRooms.has(selectedContact) && !allMessages[selectedContact] && !loadingMessages[selectedContact]) {
+//       setLoadingMessages(prev => ({ ...prev, [selectedContact]: true }));
 //       socketRef.current.emit('get_room_messages', {
 //         room_id: selectedContact,
 //         limit: 50
 //       });
 //     }
-//   }, [selectedContact, socketConnected]);
+//   }, [joinedRooms, selectedContact, allMessages, loadingMessages]);
 
 //   // Fetch chat rooms on component mount
 //   useEffect(() => {
@@ -335,45 +471,36 @@
 //   };
 
 //   const handleSendMessage = () => {
-//     if (messageInput.trim() && selectedContact && socketRef.current && socketConnected && currentUserId) {
+//     if (messageInput.trim() && selectedContact && socketRef.current && socketConnected && currentUserId && authenticated) {
 //       const messageContent = messageInput.trim();
+      
+//       // Check if we're in the room
+//       if (!joinedRooms.has(selectedContact)) {
+//         console.warn('Cannot send message: not joined to room', selectedContact);
+//         alert('You must join the room first before sending messages.');
+//         return;
+//       }
       
 //       // Emit message via socket
 //       socketRef.current.emit('send_message', {
 //         room_id: selectedContact,
-//         sender_id: currentUserId,
-//         message: messageContent
+//         message: messageContent,
+//         sender_id: currentUserId // Include sender_id for clarity
 //       });
 
-//       // Add message to local state immediately (optimistic update)
-//       const tempMessage: Message = {
-//         id: `temp_${Date.now()}`,
-//         senderId: currentUserId,
-//         sender: 'You',
-//         content: messageContent,
-//         timestamp: formatTimestamp(new Date().toISOString()),
-//         isRead: false,
-//         type: 'text',
-//         status: 'sent',
-//         isMine: true,
-//       };
-
-//       setMessages(prev => [...prev, tempMessage]);
+//       // Clear input immediately
 //       setMessageInput('');
 
-//       // Update contact's last message
-//       setContacts(prev => prev.map(contact => {
-//         if (contact.id === selectedContact) {
-//           return {
-//             ...contact,
-//             lastMessage: messageContent,
-//             timestamp: tempMessage.timestamp
-//           };
-//         }
-//         return contact;
-//       }));
+//       // NOTE: We don't add optimistic update here anymore since 
+//       // the new_message event will handle adding the message to state
+//       // This prevents duplicate messages
+      
 //     } else if (!currentUserId) {
 //       alert('Authentication error. Please log in again.');
+//     } else if (!authenticated) {
+//       alert('Please wait for authentication to complete.');
+//     } else if (!joinedRooms.has(selectedContact)) {
+//       alert('Please wait for room connection to complete.');
 //     }
 //   };
 
@@ -402,6 +529,8 @@
 //   );
 
 //   const selectedContactData = contacts.find(c => c.id === selectedContact);
+//   const isCurrentRoomLoading = selectedContact ? loadingMessages[selectedContact] : false;
+//   const isCurrentRoomJoining = selectedContact ? joiningRooms.has(selectedContact) : false;
 
 //   return (
 //     <div className="flex h-screen bg-gray-100">
@@ -421,6 +550,11 @@
 //                   <div className={`w-2 h-2 rounded-full ${
 //                     socketConnected ? 'bg-green-500' : 'bg-red-500'
 //                   }`} title={socketConnected ? 'Connected' : 'Disconnected'} />
+//                   {joinedRooms.size > 0 && (
+//                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+//                       {joinedRooms.size} rooms joined
+//                     </span>
+//                   )}
 //                 </div>
 //                 <div className="flex items-center space-x-2">
 //                   <button
@@ -501,6 +635,9 @@
 //                             {contact.name}
 //                           </h3>
 //                           {getRoomTypeIcon(contact.type)}
+//                           {joinedRooms.has(contact.id) && (
+//                             <Circle size={6} className="fill-green-500 text-green-500" title="Joined" />
+//                           )}
 //                         </div>
 //                         <span className="text-xs text-gray-500">
 //                           {contact.timestamp}
@@ -566,6 +703,11 @@
 //                             {selectedContactData.name}
 //                           </h3>
 //                           {getRoomTypeIcon(selectedContactData.type)}
+//                           {joinedRooms.has(selectedContactData.id) && (
+//                             <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+//                               Joined
+//                             </span>
+//                           )}
 //                         </div>
 //                         <p className="text-sm text-gray-500 capitalize">
 //                           {selectedContactData.type} chat • {selectedContactData.status}
@@ -592,15 +734,15 @@
 
 //                 {/* Messages */}
 //                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-//                   {loadingMessages ? (
+//                   {isCurrentRoomLoading ? (
 //                     <div className="flex items-center justify-center py-8">
 //                       <div className="text-center">
 //                         <Loader2 size={24} className="animate-spin text-gray-400 mx-auto mb-2" />
 //                         <p className="text-gray-500 text-sm">Loading messages...</p>
 //                       </div>
 //                     </div>
-//                   ) : messages.length > 0 ? (
-//                     messages.map((message) => (
+//                   ) : currentRoomMessages.length > 0 ? (
+//                     currentRoomMessages.map((message) => (
 //                       <div
 //                         key={message.id}
 //                         className={`flex ${message.isMine ? 'justify-end' : 'justify-start'}`}
@@ -656,9 +798,11 @@
 //                             ? "Connecting..." 
 //                             : !currentUserId 
 //                               ? "Please log in to send messages..."
-//                               : "Type a message..."
+//                               : !joinedRooms.has(selectedContact)
+//                                 ? "Joining room..."
+//                                 : "Type a message..."
 //                         }
-//                         disabled={!socketConnected || !currentUserId}
+//                         disabled={!socketConnected || !currentUserId || !joinedRooms.has(selectedContact)}
 //                         className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
 //                         rows={1}
 //                         style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -669,16 +813,18 @@
 //                     </div>
 //                     <button
 //                       onClick={handleSendMessage}
-//                       disabled={!messageInput.trim() || !socketConnected || !currentUserId}
+//                       disabled={!messageInput.trim() || !socketConnected || !currentUserId || !joinedRooms.has(selectedContact)}
 //                       className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
 //                       title={
 //                         !socketConnected 
 //                           ? "Connecting to server..." 
 //                           : !currentUserId 
 //                             ? "Please log in to send messages"
-//                             : !messageInput.trim()
-//                               ? "Type a message to send"
-//                               : "Send message"
+//                             : !joinedRooms.has(selectedContact)
+//                               ? "Joining room..."
+//                               : !messageInput.trim()
+//                                 ? "Type a message to send"
+//                                 : "Send message"
 //                       }
 //                     >
 //                       <Send size={18} />
@@ -1053,6 +1199,27 @@ function MessagingPage() {
     }
   }, [socketConnected, currentUserId, authenticated]);
 
+  // Auto-join all available rooms when authenticated and have contacts
+  useEffect(() => {
+    if (socketRef.current && socketConnected && currentUserId && authenticated && contacts.length > 0) {
+      contacts.forEach(contact => {
+        // Only join if we haven't joined this room yet and aren't currently joining
+        if (!joinedRooms.has(contact.id) && !joiningRooms.has(contact.id)) {
+          console.log('🏠 Auto-joining room:', contact.id, contact.name);
+          
+          // Mark as joining to prevent duplicate requests
+          setJoiningRooms(prev => new Set([...prev, contact.id]));
+          
+          // Join the room
+          socketRef.current!.emit('join_room', {
+            room_id: contact.id,
+            user_id: currentUserId
+          });
+        }
+      });
+    }
+  }, [socketConnected, currentUserId, authenticated, contacts, joinedRooms, joiningRooms]);
+
   // Separate effect for room joining when selecting a contact
   useEffect(() => {
     if (selectedContact && socketRef.current && socketConnected && currentUserId && authenticated) {
@@ -1138,9 +1305,43 @@ function MessagingPage() {
         if (transformedContacts.length > 0 && !selectedContact) {
           setSelectedContact(transformedContacts[0].id);
         }
+
+        // Auto-join all rooms if authenticated and connected
+        if (socketRef.current && socketConnected && currentUserId && authenticated) {
+          transformedContacts.forEach(contact => {
+            if (!joinedRooms.has(contact.id) && !joiningRooms.has(contact.id)) {
+              console.log('🏠 Auto-joining room after fetch:', contact.id, contact.name);
+              
+              setJoiningRooms(prev => new Set([...prev, contact.id]));
+              
+              socketRef.current!.emit('join_room', {
+                room_id: contact.id,
+                user_id: currentUserId
+              });
+            }
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to fetch chat rooms:', err);
+    }
+  };
+
+  // Manual connect all rooms function
+  const connectAllRooms = () => {
+    if (socketRef.current && socketConnected && currentUserId && authenticated) {
+      contacts.forEach(contact => {
+        if (!joinedRooms.has(contact.id) && !joiningRooms.has(contact.id)) {
+          console.log('🏠 Manually joining room:', contact.id, contact.name);
+          
+          setJoiningRooms(prev => new Set([...prev, contact.id]));
+          
+          socketRef.current!.emit('join_room', {
+            room_id: contact.id,
+            user_id: currentUserId
+          });
+        }
+      });
     }
   };
 
@@ -1262,11 +1463,6 @@ function MessagingPage() {
                   <div className={`w-2 h-2 rounded-full ${
                     socketConnected ? 'bg-green-500' : 'bg-red-500'
                   }`} title={socketConnected ? 'Connected' : 'Disconnected'} />
-                  {joinedRooms.size > 0 && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {joinedRooms.size} rooms joined
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -1288,6 +1484,29 @@ function MessagingPage() {
                     <Plus size={18} />
                   </button>
                 </div>
+              </div>
+              
+              {/* Connection Status */}
+              <div className="mb-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">
+                    Connected: {joinedRooms.size}/{contacts.length} rooms
+                  </span>
+                  {joiningRooms.size > 0 && (
+                    <span className="text-blue-500 bg-blue-100 px-2 py-1 rounded">
+                      {joiningRooms.size} connecting...
+                    </span>
+                  )}
+                </div>
+                {contacts.length - joinedRooms.size > 0 && socketConnected && authenticated && (
+                  <button 
+                    onClick={connectAllRooms}
+                    className="text-blue-500 text-xs hover:underline mt-1"
+                    disabled={!socketConnected || !authenticated}
+                  >
+                    Connect All Remaining ({contacts.length - joinedRooms.size})
+                  </button>
+                )}
               </div>
               
               {/* Search */}
@@ -1349,6 +1568,9 @@ function MessagingPage() {
                           {getRoomTypeIcon(contact.type)}
                           {joinedRooms.has(contact.id) && (
                             <Circle size={6} className="fill-green-500 text-green-500" title="Joined" />
+                          )}
+                          {joiningRooms.has(contact.id) && (
+                            <Loader2 size={12} className="animate-spin text-blue-500" title="Connecting..." />
                           )}
                         </div>
                         <span className="text-xs text-gray-500">
@@ -1418,6 +1640,12 @@ function MessagingPage() {
                           {joinedRooms.has(selectedContactData.id) && (
                             <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
                               Joined
+                            </span>
+                          )}
+                          {joiningRooms.has(selectedContactData.id) && (
+                            <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded flex items-center">
+                              <Loader2 size={12} className="animate-spin mr-1" />
+                              Connecting...
                             </span>
                           )}
                         </div>
