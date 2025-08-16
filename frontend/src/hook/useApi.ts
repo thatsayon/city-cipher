@@ -32,20 +32,25 @@ const useApi = <T = any>(): UseApiResult<T> => {
     setError(null);
 
     try {
-      // Pull token from storage if available
-      const token =
-        typeof window !== 'undefined'
-          ? sessionStorage.getItem('access_token')
-          : null;
+
+      // Pull token from cookie if available
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        const match = document.cookie.match(/(?:^|; )access_token=([^;]*)/);
+        token = match ? decodeURIComponent(match[1]) : null;
+      }
+
+      // Always set Authorization header if token exists
+      const mergedHeaders = {
+        ...headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
 
       const res = await api.request<T>({
         method,
         url,
         data,
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...headers,
-        },
+        headers: mergedHeaders,
       });
 
       setResponse(res.data);
