@@ -16,6 +16,7 @@ from .serializers import (
     UserChatRoomSerializer,
 )
 
+# hi
 class GetUserChatRooms(generics.ListAPIView):
     serializer_class = UserChatRoomSerializer
     permission_classes = [permissions.IsAuthenticated]
